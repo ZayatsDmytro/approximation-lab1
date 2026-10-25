@@ -1,0 +1,405 @@
+/* style.css — стилі сторінки лабораторної: світла й темна теми, сітка графіків, форма */
+
+/* ---------- Кольори та шрифти (CSS-змінні; plot.js читає кольори графіків звідси) ---------- */
+:root {
+  --bg: #f4f3ee;
+  --surface: #ffffff;
+  --surface-2: #f8f7f3;
+  --text: #1c2229;
+  --muted: #5d6672;
+  --border: #dcd8cd;
+  --accent: #1f4fa3;
+  --accent-text: #ffffff;
+  --accent-soft: #e6edf9;
+  --danger: #b3261e;
+  --danger-bg: #fdecea;
+
+  --chart-bg: #ffffff;
+  --chart-grid: #e6e3da;
+  --chart-axis: #6b7179;        /* контраст з білим ≈ 4.9:1 */
+  --chart-text: #4a525c;        /* ≈ 7.9:1 */
+  --c-point: #1c2229;
+  --c-curve: #1f4fa3;           /* синій, ≈ 8:1 */
+  --c-lsq: #b8461b;             /* помаранчево-цегляний, ≈ 5.2:1; пара синій/помаранчевий розрізняється при дальтонізмі */
+  --c-residual: #b8461b;
+  --c-extrap-bg: rgba(110, 100, 80, 0.07);
+  --c-extrap-line: rgba(110, 100, 80, 0.22);
+  --c-guide: #6b7179;
+  --c-zero: #1c2229;
+  --c-highlight: #c2185b;       /* малиновий: новий вузол / відрізок, що росте; ≈ 5.9:1 */
+
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --radius: 10px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171b;
+    --surface: #1c2025;
+    --surface-2: #22272d;
+    --text: #e6e8eb;
+    --muted: #9aa3ad;
+    --border: #333a42;
+    --accent: #7ea8ff;
+    --accent-text: #0d1420;
+    --accent-soft: #23314a;
+    --danger: #ff8a80;
+    --danger-bg: #3a1f1d;
+
+    --chart-bg: #1c2025;
+    --chart-grid: #2c3138;
+    --chart-axis: #858d97;
+    --chart-text: #aab2bc;
+    --c-point: #eef0f2;
+    --c-curve: #7ea8ff;
+    --c-lsq: #ff9a66;
+    --c-residual: #ff9a66;
+    --c-extrap-bg: rgba(200, 190, 170, 0.06);
+    --c-extrap-line: rgba(200, 190, 170, 0.18);
+    --c-guide: #858d97;
+    --c-zero: #e6e8eb;
+    --c-highlight: #ff6fae;
+    color-scheme: dark;
+  }
+}
+
+/* ---------- Базові стилі ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 var(--font-ui);
+}
+
+h1, h2 { margin: 0; line-height: 1.25; }
+h2 { font-size: 1.05rem; font-weight: 650; }
+code { font-family: var(--font-mono); font-size: 0.9em; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.muted, .hint { color: var(--muted); font-size: 0.875rem; margin: 4px 0 12px; }
+
+/* ---------- Шапка ---------- */
+.app-header {
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 22px 20px 10px;
+}
+.app-header h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.01em; }
+.subtitle { margin: 4px 0 0; color: var(--muted); }
+
+/* ---------- Панель керування ---------- */
+.toolbar {
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 8px 20px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 28px;
+  align-items: flex-end;
+}
+
+.segmented { border: 0; margin: 0; padding: 0; min-width: 0; }
+.segmented legend, .control-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.segmented-options {
+  display: inline-flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+}
+.segmented-options label { position: relative; }
+.segmented-options input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.segmented-options span {
+  display: block;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 550;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  min-width: 44px;
+  text-align: center;
+}
+.segmented-options input:checked + span { background: var(--accent); color: var(--accent-text); }
+.segmented-options input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.degree-control select {
+  display: block;
+  font: inherit;
+  padding: 7px 10px;
+  min-width: 90px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* ---------- Макет ---------- */
+.layout {
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.panel, .chart-row, .table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.panel { padding: 16px; position: sticky; top: 12px; }
+
+/* ---------- Форма ---------- */
+.points-wrap { max-height: 360px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+
+.points-table { width: 100%; border-collapse: collapse; }
+.points-table th {
+  position: sticky; top: 0;
+  background: var(--surface-2);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: left;
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.points-table td { padding: 3px 4px; border-bottom: 1px solid var(--border); }
+.points-table tr:last-child td { border-bottom: 0; }
+.points-table td.idx { width: 28px; text-align: right; color: var(--muted); font-size: 0.82rem; padding-right: 6px; }
+
+.points-table input {
+  width: 100%;
+  font: 0.92rem var(--font-mono);
+  padding: 5px 7px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: 5px;
+}
+.points-table input:hover { border-color: var(--border); }
+.points-table input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.points-table input.invalid { border-color: var(--danger); background: var(--danger-bg); }
+
+.btn-icon {
+  width: 28px; height: 28px;
+  border: 0; border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.btn-icon:hover { background: var(--danger-bg); color: var(--danger); }
+.btn-icon:focus-visible { outline: 2px solid var(--accent); }
+
+.form-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+
+.btn {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 550;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn-ghost { background: transparent; }
+.btn-primary {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.bulk { margin: 6px 0 4px; }
+.bulk summary { cursor: pointer; color: var(--accent); font-weight: 550; font-size: 0.9rem; }
+.bulk label { display: block; font-size: 0.85rem; color: var(--muted); margin: 8px 0 4px; }
+.bulk textarea {
+  width: 100%;
+  font: 0.9rem var(--font-mono);
+  padding: 8px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+  margin-bottom: 6px;
+}
+
+.errors { list-style: none; margin: 8px 0 0; padding: 0; }
+.errors li {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.dirty-note { margin: 8px 0 0; font-size: 0.82rem; color: var(--muted); text-align: center; }
+
+/* ---------- Графіки ---------- */
+.results { display: grid; gap: 16px; min-width: 0; align-content: start; }
+.tab-panel { display: grid; gap: 20px; min-width: 0; }
+
+/* ---------- Вкладки ---------- */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
+.tab {
+  font: inherit;
+  font-weight: 600;
+  padding: 9px 16px;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+  border-bottom-color: var(--surface);
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Панель покрокової анімації */
+.demo-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 14px; }
+.btn-sm { padding: 5px 11px; font-size: 0.85rem; }
+.btn:disabled { opacity: 0.45; cursor: default; border-color: var(--border); }
+.demo-track { flex: 0 0 120px; height: 6px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+.demo-fill { height: 100%; width: 0; background: var(--accent); }
+.demo-status { flex: 1 1 220px; color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; min-width: 0; }
+
+/* Вкладка «Набір»: два великі графіки поруч, залишки на всю ширину.
+   Flex, а не grid: якщо режим ховає один графік, інший займає всю ширину. */
+.focus-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+.focus-grid > .chart { flex: 1 1 320px; min-width: 0; }
+.focus-grid > .chart-wide { flex-basis: 100%; }
+.focus-grid .chart-resid canvas { aspect-ratio: 4 / 1; }
+
+.chart-row { padding: 14px 16px 16px; }
+.row-title { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.swatch { width: 14px; height: 3px; border-radius: 2px; }
+.swatch-curve { background: var(--c-curve); }
+.swatch-lsq { background: var(--c-lsq); }
+
+.chart-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+
+.chart {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* полотна в ряду вирівнюються по низу, навіть якщо підпис у два рядки */
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--chart-bg);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.chart.is-active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.chart figcaption { display: flex; flex-direction: column; gap: 1px; padding: 0 4px 6px; }
+.chart-title { font-weight: 650; font-size: 0.92rem; }
+.chart-sub { font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.chart canvas { display: block; width: 100%; aspect-ratio: 4 / 3; cursor: crosshair; touch-action: pan-y; }
+.chart-resid canvas { aspect-ratio: 2 / 1; }   /* залишки — нижча смуга */
+.tooltip em { font-style: normal; opacity: 0.75; }
+
+/* ---------- Таблиці результатів ---------- */
+.tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; }
+.table-card { padding: 14px 16px 16px; min-width: 0; }
+
+.table-wrap { overflow-x: auto; }
+.data-table { border-collapse: collapse; font: 0.84rem var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.data-table th {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: right;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.data-table td { text-align: right; padding: 4px 10px; border-bottom: 1px solid var(--border); }
+.data-table td.empty { background: var(--surface-2); }
+.data-table tr.coef-row td { background: var(--accent-soft); font-weight: 650; }
+
+.card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.segmented-sm .segmented-options span { padding: 3px 10px; font-size: 0.82rem; min-width: 32px; }
+.check-ok { color: #2e7d32; }
+.check-fail { color: var(--danger); }
+@media (prefers-color-scheme: dark) { .check-ok { color: #81c784; } }
+
+.formula { font: 0.92rem var(--font-mono); margin: 4px 0 12px; overflow-wrap: anywhere; }
+
+.summary { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0 0; }
+.summary div { display: flex; gap: 8px; align-items: baseline; }
+.summary dt { color: var(--muted); font-size: 0.82rem; }
+.summary dd { margin: 0; font: 600 0.92rem var(--font-mono); }
+
+/* ---------- Підказка ---------- */
+.tooltip {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+  background: var(--text);
+  color: var(--bg);
+  font: 0.8rem/1.45 var(--font-mono);
+  padding: 7px 10px;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+}
+.tooltip strong { font-family: var(--font-ui); }
+
+/* ---------- Адаптивність ---------- */
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .panel { position: static; }
+}
+
+@media (max-width: 768px) {
+  .focus-grid .chart-resid canvas { aspect-ratio: 2 / 1; }
+  .tab { padding: 8px 12px; }
+  .app-header, .toolbar { padding-left: 16px; padding-right: 16px; }
+  .layout { padding: 0 16px 32px; }
+  .chart-grid { grid-template-columns: minmax(0, 1fr); }
+  .tables { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart { transition: none; }
+}

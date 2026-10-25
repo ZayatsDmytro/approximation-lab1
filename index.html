@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Апроксимація функцій — варіант 14</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>Апроксимація функцій методами інтерполяції та МНК</h1>
+    <p class="subtitle">Лабораторна робота · варіант 14</p>
+  </header>
+
+  <!-- Панель керування: набір, режим, степінь МНК -->
+  <section class="toolbar" aria-label="Керування">
+    <fieldset class="segmented">
+      <legend>Набір точок</legend>
+      <div class="segmented-options">
+        <label><input type="radio" name="dataset" value="set5" checked><span>5</span></label>
+        <label><input type="radio" name="dataset" value="set10"><span>10</span></label>
+        <label><input type="radio" name="dataset" value="set20"><span>20</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="segmented">
+      <legend>Режим</legend>
+      <div class="segmented-options">
+        <label><input type="radio" name="mode" value="interp"><span>Інтерполяція</span></label>
+        <label><input type="radio" name="mode" value="lsq"><span>МНК</span></label>
+        <label><input type="radio" name="mode" value="all" checked><span>Усі</span></label>
+      </div>
+    </fieldset>
+
+    <label class="degree-control" data-mode="lsq">
+      <span class="control-label">Степінь МНК, m</span>
+      <select id="degree">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+      </select>
+    </label>
+  </section>
+
+  <main class="layout">
+    <!-- Ручний ввід точок активного набору -->
+    <aside class="panel" aria-labelledby="form-title">
+      <h2 id="form-title">Точки: <span id="dataset-name"></span></h2>
+      <p class="hint">Вкладка «Набір» показує ці точки; у «Порівнянні» їхні графіки виділено рамкою.</p>
+
+      <form id="points-form" novalidate>
+        <div class="table-wrap points-wrap">
+          <table class="points-table">
+            <thead>
+              <tr><th scope="col">#</th><th scope="col">x</th><th scope="col">y</th><th scope="col"><span class="sr-only">Дії</span></th></tr>
+            </thead>
+            <tbody id="points-body"></tbody>
+          </table>
+        </div>
+
+        <div class="form-row">
+          <button type="button" id="add-point" class="btn">+ Додати точку</button>
+          <button type="button" id="reset-points" class="btn btn-ghost">Скинути до варіанту</button>
+        </div>
+
+        <details class="bulk">
+          <summary>Ввести списком</summary>
+          <label for="bulk-input">Одна точка на рядок: <code>x y</code> або <code>x;y</code></label>
+          <textarea id="bulk-input" rows="6" spellcheck="false" placeholder="-2 -8.2&#10;-1;-1.1&#10;0 0.2"></textarea>
+          <button type="button" id="bulk-apply" class="btn">Перенести в таблицю</button>
+        </details>
+
+        <ul id="errors" class="errors" aria-live="polite"></ul>
+
+        <button type="submit" class="btn btn-primary">Застосувати й перерахувати</button>
+        <p id="dirty-note" class="dirty-note" hidden>Є незастосовані зміни</p>
+      </form>
+    </aside>
+
+    <section class="results" aria-label="Результати">
+      <!-- Вкладки: активний набір / порівняння трьох наборів -->
+      <div class="tabs" role="tablist" aria-label="Подання результатів">
+        <button type="button" class="tab" role="tab" id="tab-focus" aria-controls="panel-focus" aria-selected="true" data-tab="focus">Набір</button>
+        <button type="button" class="tab" role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false" tabindex="-1" data-tab="compare">Порівняння</button>
+      </div>
+
+      <!-- Вкладка «Набір»: великі графіки активного набору і таблиці -->
+      <div class="tab-panel" role="tabpanel" id="panel-focus" aria-labelledby="tab-focus">
+        <div class="chart-row">
+          <!-- Покрокова анімація: Лагранж → МНК → залишки (js/animation.js) -->
+          <div class="demo-bar" role="group" aria-label="Покрокова анімація">
+            <button type="button" id="demo-start" class="btn btn-sm">▶ Старт</button>
+            <button type="button" id="demo-pause" class="btn btn-sm" disabled>⏸ Пауза</button>
+            <button type="button" id="demo-reset" class="btn btn-sm btn-ghost" disabled>↺ Скидання</button>
+            <div class="demo-track" role="progressbar" aria-label="Хід анімації" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div id="demo-progress" class="demo-fill"></div>
+            </div>
+            <span id="demo-status" class="demo-status"></span>
+          </div>
+          <div class="focus-grid">
+          <figure class="chart chart-focus" data-mode="interp" data-view="focus" data-kind="lagrange">
+            <figcaption><span class="chart-title"></span><span class="chart-sub"></span></figcaption>
+            <canvas role="img" aria-label="Інтерполяція Лагранжа, активний набір"></canvas>
+          </figure>
+          <figure class="chart chart-focus" data-mode="lsq" data-view="focus" data-kind="lsq">
+            <figcaption><span class="chart-title"></span><span class="chart-sub"></span></figcaption>
+            <canvas role="img" aria-label="МНК, активний набір"></canvas>
+          </figure>
+          <figure class="chart chart-resid chart-wide" data-mode="lsq" data-view="focus" data-kind="resid">
+            <figcaption><span class="chart-title"></span><span class="chart-sub"></span></figcaption>
+            <canvas role="img" aria-label="Залишки МНК, активний набір"></canvas>
+          </figure>
+          </div>
+        </div>
+
+        <!-- Таблиці для активного набору -->
+        <div class="tables">
+          <section class="table-card" data-mode="interp">
+            <div class="card-head">
+              <h2 id="divided-title">Таблиця поділених різниць</h2>
+              <fieldset class="segmented segmented-sm">
+                <legend class="sr-only">Змінна таблиці</legend>
+                <div class="segmented-options">
+                  <label><input type="radio" name="table-space" value="x" checked><span>x</span></label>
+                  <label><input type="radio" name="table-space" value="t"><span>t ∈ [−1, 1]</span></label>
+                </div>
+              </fieldset>
+            </div>
+            <p id="newton-info" class="muted"></p>
+            <div class="table-wrap"><table id="divided-table" class="data-table"></table></div>
+          </section>
+
+          <section class="table-card" data-mode="lsq">
+            <h2 id="residual-title">Залишки МНК</h2>
+            <p id="lsq-formula" class="formula"></p>
+            <div class="table-wrap"><table id="residual-table" class="data-table"></table></div>
+            <dl id="lsq-summary" class="summary"></dl>
+          </section>
+        </div>
+      </div>
+
+      <!-- Вкладка «Порівняння»: 6 полотен, кожне зі своїм автомасштабом -->
+      <div class="tab-panel" role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" hidden>
+        <div class="chart-row" data-mode="interp">
+          <h2 class="row-title"><span class="swatch swatch-curve"></span>Інтерполяція Лагранжа</h2>
+          <div class="chart-grid">
+          <figure class="chart" data-view="compare" data-kind="lagrange" data-set="set5">
+            <figcaption><span class="chart-title"></span><span class="chart-sub"></span></figcaption>
+            <canvas role="img" aria-label="Інтерполяція Лагранжа, 5 точок"></canvas>
+          </figure>
+          <figure class="chart" data-view="compare" data-kind="lagrange" data-set="set10">
+            <figcaption><span class="chart-title"></span><span class="chart-sub"></span></figcaption>
+            <canvas role="img" aria-label="Інтерполяція Лагранжа, 8 точок"></canvas>
+          </figure>
+          <figure class="chart" data-view="compare" data-kind="lagrange" data-set="set20">
+            <figcaption><span class="chart-title"></span><span class="chart-sub"></span></figcaption>
+            <canvas role="img" aria-label="Інтерполяція Лагранжа, 20 точок"></canvas>
+          </figure>
+          </div>
+        </div>
+
+        <div class="chart-row" data-mode="lsq">
+          <h2 class="row-title"><span class="swatch swatch-lsq"></span>Метод найменших квадратів · <span id="compare-degree">m = 3</span> для всіх наборів</h2>
+          <div class="chart-grid">
+          <figure class="chart" data-view="compare" data-kind="lsq" data-set="set5">
+            <figcaption><span class="chart-title"></span><span class="chart-sub"></span></figcaption>
+            <canvas role="img" aria-label="МНК, 5 точок"></canvas>
+          </figure>
+          <figure class="chart" data-view="compare" data-kind="lsq" data-set="set10">
+            <figcaption><span class="chart-title"></span><span class="chart-sub"></span></figcaption>
+            <canvas role="img" aria-label="МНК, 8 точок"></canvas>
+          </figure>
+          <figure class="chart" data-view="compare" data-kind="lsq" data-set="set20">
+            <figcaption><span class="chart-title"></span><span class="chart-sub"></span></figcaption>
+            <canvas role="img" aria-label="МНК, 20 точок"></canvas>
+          </figure>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+
+  <!-- Звичайні скрипти (без type="module"): сторінка працює з диска, без сервера.
+       Порядок важливий: дані → обчислення → анімація → графіки → головний модуль. -->
+  <script src="js/data.js"></script>
+  <script src="js/lagrange.js"></script>
+  <script src="js/lsq.js"></script>
+  <script src="js/validation.js"></script>
+  <script src="js/animation.js"></script>
+  <script src="js/plot.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
