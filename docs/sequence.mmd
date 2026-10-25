@@ -1,0 +1,45 @@
+sequenceDiagram
+    autonumber
+    actor U as Користувач
+    participant M as main.js
+    participant D as data.js
+    participant L as lagrange.js
+    participant Q as lsq.js
+    participant P as plot.js
+    participant A as animation.js
+
+    rect rgba(31, 79, 163, 0.08)
+    Note over M,Q: recompute() — під час старту, зміни m або точок (не при перемиканні набору)
+    M->>D: DATASETS[set5 / set10 / set20].points
+    D-->>M: точки варіанту 14
+    loop для кожного з трьох наборів
+        M->>L: createInterpolant(xs, ys)
+        L-->>M: interp {lagrange, newton, tableX}
+        M->>L: verifyNodes(interp)
+        L-->>M: перевірка вузлів {ok, maxError}
+        M->>Q: lsqFit(xs, ys, m)
+        Q-->>M: FitResult {coeffs, residuals, RMSE, R2} або помилка
+    end
+    M->>M: state.results[набір] = {interp, check, fit}
+    end
+
+    U->>M: обирає набір «20» (change на input[name=dataset])
+    M->>A: demo.reset()
+    A->>P: clearFrame() графіків, якщо йшла покрокова анімація
+    M->>M: state.datasetKey = 'set20'
+    M->>D: DATASETS.set20.short
+    D-->>M: назва набору для форми й підписів
+    M->>M: renderForm() — точки у формі
+    M->>P: feedCharts(): setData() для 3 графіків «Набору» і 6 «Порівняння»
+    P->>P: дискретизація кривих, computeBounds() — автомасштаб +10 %
+    M->>L: renderNodeCheck(), renderDividedTable(interp)
+    L-->>M: HTML-таблиця поділених різниць
+    M->>M: renderResidualTable(fit), updateActiveHighlight()
+    M->>P: renderCharts(): animate() видимих графіків «Набору»
+    P->>A: Animation.animate(700 мс, onFrame)
+    loop кожен кадр requestAnimationFrame
+        A->>P: onFrame(progress)
+        P->>P: render(progress): сітка, осі, крива до progress, точки, легенда
+    end
+    A-->>P: onDone
+    P-->>U: оновлені графіки й таблиці набору «20 точок»

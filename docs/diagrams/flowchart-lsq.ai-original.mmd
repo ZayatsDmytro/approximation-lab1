@@ -1,0 +1,41 @@
+flowchart TD
+    Start(["Початок: lsqFit(xs, ys, m)"]) --> Chk{"m < n?"}
+    Chk -- Ні --> Err1(["Помилка: замало точок для степеня m"])
+    Chk -- Так --> V0
+
+    subgraph VAND["1. Матриця Вандермонда"]
+        V0["p ← m + 1<br/>A ← нульова матриця n × p<br/>b ← копія ys"] --> V1["A[i][j] ← xs[i]^j<br/>i = 0..n−1, j = 0..p−1"]
+    end
+
+    V1 --> H0
+
+    subgraph HH["2. QR-розклад Хаусхолдера"]
+        H0["k ← 0"] --> H1{"k < p?"}
+        H1 -- Так --> H2["v ← стовпець A[k..n−1][k]<br/>norm ← ‖v‖"]
+        H2 --> H3{"norm ≈ 0?"}
+        H3 -- Так --> H7["k ← k + 1"]
+        H3 -- Ні --> H4["α ← −sign(v[0]) · norm<br/>v[0] ← v[0] − α<br/>vtv ← vᵀv"]
+        H4 --> H5["для j = k..p−1:<br/>A[k..][j] ← A[k..][j] − 2v · (vᵀA[k..][j]) / vtv"]
+        H5 --> H6["b[k..] ← b[k..] − 2v · (vᵀb[k..]) / vtv"]
+        H6 --> H7
+        H7 --> H1
+    end
+
+    H1 -- Ні --> B0
+
+    subgraph BS["3. Зворотна підстановка R·a = Qᵀy"]
+        B0["R ← A[0..p−1][0..p−1]<br/>c ← b[0..p−1]<br/>i ← p − 1"] --> B1{"i ≥ 0?"}
+        B1 -- Так --> B2{"abs(R[i][i]) < EPS?"}
+        B2 -- Так --> Err2(["Помилка: матриця вироджена"])
+        B2 -- Ні --> B3["a[i] ← (c[i] − Σ R[i][j]·a[j], j > i) / R[i][i]<br/>i ← i − 1"]
+        B3 --> B1
+    end
+
+    B1 -- Ні --> R0
+
+    subgraph RES["4. Залишки та метрики"]
+        R0["r[i] ← ys[i] − horner(a, xs[i])"] --> R1["S ← Σ r[i]²<br/>rmse ← √(S / n)<br/>maxAbs ← max abs(r[i])"]
+        R1 --> R2["R² ← 1 − S / Σ (ys[i] − ȳ)²"]
+    end
+
+    R2 --> Done(["Повернути FitResult"])

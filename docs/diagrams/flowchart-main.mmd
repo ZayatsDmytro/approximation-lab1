@@ -1,0 +1,34 @@
+flowchart TD
+    A(["DOMContentLoaded"]) --> B["init():<br/>знайти DOM-елементи → els<br/>створити графіки Plot / ResidualPlot за data-view, data-kind, data-set<br/>повісити обробники, createDemo()"]
+    B --> C["state ← набір set5, режим «Усі», m = 3"]
+    C --> D
+
+    subgraph CALC["Обчислення"]
+        D["recompute():<br/>для кожного набору — createInterpolant(), verifyNodes(), lsqFit()"] --> D2["renderTables():<br/>поділені різниці та залишки активного набору"]
+    end
+
+    D2 --> FC["feedCharts():<br/>setData() для графіків обох вкладок"]
+    FC --> AS["Plot.computeBounds():<br/>межі x/y + відступ 10 %,<br/>обмеження хвостів екстраполяції"]
+    AS --> AN["renderCharts() → chart.animate():<br/>requestAnimationFrame, progress 0 → 1"]
+    AN --> RD["chart.render(progress):<br/>зона екстраполяції, сітка, осі,<br/>залишки, крива, точки, легенда"]
+    RD --> P{"progress < 1?"}
+    P -- Так --> AN
+    P -- Ні --> W{"Подія користувача"}
+
+    W -- "Вибір набору 5/10/20" --> S1["onDatasetChange():<br/>state.datasetKey"]
+    W -- "Зміна m" --> S3["onDegreeChange():<br/>recompute без Лагранжа"]
+    W -- "Застосувати точки" --> S2["onFormSubmit():<br/>validatePoints()"]
+    W -- "Перемикач режиму" --> S4["onModeChange():<br/>applyModeVisibility()"]
+    W -- "Вкладка / Старт анімації" --> S5["selectTab() / demo.play()"]
+    W -- "Наведення миші" --> T["chart.hitTest()<br/>chart.showTooltip()"]
+
+    S1 --> FC
+    S3 --> D
+    S2 --> V{"Дані коректні?"}
+    V -- Ні --> E["showErrors()"]
+    E --> W
+    V -- Так --> D
+    S4 --> RA["renderCharts():<br/>перемалювати видимі графіки"]
+    S5 --> RA
+    RA --> W
+    T --> W

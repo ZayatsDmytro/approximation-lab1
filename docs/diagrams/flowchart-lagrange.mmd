@@ -1,0 +1,13 @@
+flowchart TD
+    A(["Початок: lagrange(xs, ys, x)"]) --> B["n ← xs.length<br/>sum ← 0<br/>i ← 0"]
+    B --> C{"i < n?"}
+    C -- Ні --> R(["Повернути sum"])
+    C -- Так --> D["term ← ys[i]<br/>j ← 0"]
+    D --> E{"j < n?"}
+    E -- Ні --> F["sum ← sum + term<br/>i ← i + 1"]
+    F --> C
+    E -- Так --> G{"j ≠ i?"}
+    G -- Так --> H["term ← term · (x − xs[j]) / (xs[i] − xs[j])"]
+    G -- Ні --> I["j ← j + 1"]
+    H --> I
+    I --> E

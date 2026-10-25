@@ -1,0 +1,42 @@
+flowchart TD
+    Start(["Початок: lsqFit(xs, ys, m)"]) --> Chk{"m < n?"}
+    Chk -- Ні --> Err1(["Помилка: потрібно щонайменше m + 1 точок"])
+    Chk -- Так --> N0
+
+    subgraph NORM["1. Нормалізація x"]
+        N0["createNormalizer(xs):<br/>center ← (xmin + xmax) / 2<br/>half ← (xmax − xmin) / 2"] --> N1["tᵢ ← (xᵢ − center) / half,<br/>tᵢ ∈ [−1, 1]"]
+    end
+
+    N1 --> V0
+
+    subgraph VAND["2. Дизайн-матриця"]
+        V0["designMatrix(ts, m):<br/>A[i][j] ← tᵢ^j,<br/>i = 0..n−1, j = 0..m"]
+    end
+
+    V0 --> H0
+
+    subgraph HH["3. QR-розклад Хаусхолдера"]
+        H0["householderQR(A), k ← 0"] --> H1{"k ≤ m?"}
+        H1 -- Так --> H2["norm ← ‖A[k..n−1][k]‖<br/>α ← −sign(A[k][k]) · norm"]
+        H2 --> H3["v ← A[k..][k] − α·e₁<br/>β ← 2 / vᵀv"]
+        H3 --> H4["для j = k..m:<br/>A[k..][j] ← A[k..][j] − β·v·(vᵀA[k..][j])"]
+        H4 --> H5["зберегти v, β; k ← k + 1"]
+        H5 --> H1
+    end
+
+    H1 -- Ні --> Q0["applyQT(qr, ys):<br/>d ← Qᵀy відбиттями H₀…Hₘ"]
+    Q0 --> B0
+
+    subgraph BS["4. Зворотна підстановка"]
+        B0["backSubstitute(R, d):<br/>cₜ[i] ← (d[i] − Σ R[i][j]·cₜ[j], j > i) / R[i][i]"]
+    end
+
+    B0 --> R0
+
+    subgraph RES["5. Залишки та метрики"]
+        R0["ŷᵢ ← horner(cₜ, tᵢ)<br/>rᵢ ← yᵢ − ŷᵢ"] --> R1["SSE ← Σ rᵢ²<br/>RMSE ← √(SSE / n)<br/>maxAbs ← max |rᵢ|"]
+        R1 --> R2["R² ← 1 − SSE / SST<br/>(NaN, якщо y сталі)"]
+        R2 --> R3["coeffsTtoX(cₜ):<br/>коефіцієнти в змінній x"]
+    end
+
+    R3 --> Done(["Повернути FitResult"])
