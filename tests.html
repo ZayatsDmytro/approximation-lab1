@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Тести — апроксимація, варіант 14</title>
+  <style>
+    :root {
+      --bg: #f4f3ee; --surface: #fff; --text: #1c2229; --muted: #5d6672; --border: #dcd8cd;
+      --ok: #1e7a3c; --ok-bg: #e6f4ea; --fail: #b3261e; --fail-bg: #fdecea; --accent: #1f4fa3;
+      --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14171b; --surface: #1c2025; --text: #e6e8eb; --muted: #9aa3ad; --border: #333a42;
+        --ok: #81c784; --ok-bg: #1d3324; --fail: #ff8a80; --fail-bg: #3a1f1d; --accent: #7ea8ff;
+        color-scheme: dark;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+    main { max-width: 1040px; margin: 0 auto; padding: 22px 16px 48px; }
+    h1 { font-size: 1.4rem; margin: 0 0 4px; }
+    h2 { font-size: 1.1rem; margin: 28px 0 10px; }
+    h3 { font-size: 0.95rem; margin: 18px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    p { margin: 4px 0 10px; }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    a { color: var(--accent); }
+    .summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 10px; margin: 14px 0 6px; font-weight: 600; }
+    .summary.ok { background: var(--ok-bg); color: var(--ok); }
+    .summary.fail { background: var(--fail-bg); color: var(--fail); }
+    button { font: inherit; font-size: 0.9rem; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    .tests { list-style: none; padding: 0; margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .tests li { padding: 9px 14px; border-top: 1px solid var(--border); }
+    .tests li:first-child { border-top: 0; }
+    .tests .head { display: flex; gap: 10px; align-items: baseline; }
+    .tests .mark { font-weight: 700; width: 1.2em; flex: none; }
+    .tests .pass .mark { color: var(--ok); }
+    .tests .fail .mark { color: var(--fail); }
+    .tests .name { flex: 1; }
+    .tests .time { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+    .tests .details { margin: 4px 0 0 1.95em; font: 0.8rem/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; }
+    .tests .fail .details { color: var(--fail); }
+    .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+    th, td { padding: 6px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+    td { font-family: var(--mono); font-size: 0.86rem; }
+    td.set, th.set { text-align: left; font-family: inherit; }
+    tr.group td { border-top: 2px solid var(--border); }
+    td.note { text-align: left; font-family: inherit; font-size: 0.8rem; color: var(--muted); white-space: normal; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Тести: інтерполяція та МНК</h1>
+  <p class="muted">Варіант 14 · відкривається подвійним кліком, без сервера · <a href="index.html">← до застосунку</a></p>
+
+  <div id="summary" class="summary" role="status" aria-live="polite">Тести виконуються…</div>
+  <ul id="results" class="tests" aria-label="Результати тестів"></ul>
+
+  <h2>Таблиця порівняння МНК: 5 / 8 / 20 точок, m = 2, 3, 4</h2>
+  <p class="muted">Обчислено на цьому комп'ютері під час відкриття сторінки. Час — медіана повного розрахунку
+    <code>lsqFit</code> (дизайн-матриця + QR + залишки й метрики), мікросекунди.</p>
+  <div class="table-wrap">
+    <table id="compare-table">
+      <thead>
+        <tr><th class="set">Набір</th><th>m</th><th>RMSE</th><th>max |r|</th><th>R²</th><th>час, мкс</th><th class="set">Примітка</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p><button type="button" id="rerun">Запустити ще раз</button></p>
+</main>
+
+<!-- Ті самі модулі, що й у застосунку (звичайні скрипти, без import) -->
+<script src="js/data.js"></script>
+<script src="js/lagrange.js"></script>
+<script src="js/lsq.js"></script>
+<script src="js/validation.js"></script>
+<script src="js/animation.js"></script>
+<script src="js/plot.js"></script>
+<script>
+/**
+ * Мінімальний тест-раннер: suite / test / expect*.
+ * Кожна перевірка записує рядок з фактичним значенням і допуском —
+ * у звіті видно не лише «пройшов», а й наскільки.
+ */
+(function () {
+  'use strict';
+  const A = window.Approx;
+  const registry = [];
+  let currentSuite = '';
+
+  function suite(name, body) { currentSuite = name; body(); currentSuite = ''; }
+  function test(name, body) { registry.push({ suite: currentSuite, name: name, body: body }); }
+
+  /** Помилка перевірки, що зупиняє тест. */
+  class AssertionError extends Error {}
+
+  /** Контекст одного тесту: перевірки додають рядки до details. */
+  function makeExpect(details) {
+    const e = (v) => (Number.isFinite(v) ? v.toExponential(2) : String(v));
+    return {
+      /** |actual| ≤ limit */
+      atMost(actual, limit, label) {
+        const ok = Math.abs(actual) <= limit;
+        details.push((ok ? '✓ ' : '✗ ') + label + ': ' + e(Math.abs(actual)) + ' ≤ ' + e(limit));
+        if (!ok) throw new AssertionError(label);
+      },
+      /** |actual − expected| ≤ tol */
+      close(actual, expected, tol, label) {
+        const d = Math.abs(actual - expected);
+        const ok = d <= tol;
+        details.push((ok ? '✓ ' : '✗ ') + label + ': ' + actual.toPrecision(10) + ' ≈ ' + expected.toPrecision(10) + ' (|Δ| = ' + e(d) + ')');
+        if (!ok) throw new AssertionError(label);
+      },
+      truthy(value, label) {
+        details.push((value ? '✓ ' : '✗ ') + label);
+        if (!value) throw new AssertionError(label);
+      },
+      /** Функція має кинути виняток. */
+      throws(fn, label) {
+        let thrown = null;
+        try { fn(); } catch (err) { thrown = err; }
+        details.push((thrown ? '✓ ' : '✗ ') + label + (thrown ? ': «' + thrown.message + '»' : ': винятку немає'));
+        if (!thrown) throw new AssertionError(label);
+      }
+    };
+  }
+
+  // ---------- Допоміжне ----------
+
+  const SETS = A.SET_KEYS.map((key) => {
+    const pts = A.DATASETS[key].points;
+    return { key: key, name: A.DATASETS[key].short, xs: pts.map((p) => p.x), ys: pts.map((p) => p.y) };
+  });
+
+  /** Рівномірна сітка з count + 1 точок на [a, b]. */
+  function grid(a, b, count) {
+    const out = [];
+    for (let i = 0; i <= count; i++) out.push(a + (b - a) * i / count);
+    return out;
+  }
+
+  /** max |f(x) − g(x)| на сітці і масштаб max |g(x)| (для відносного допуску). */
+  function maxDiff(f, g, xs) {
+    let d = 0, scale = 0;
+    xs.forEach((x) => { d = Math.max(d, Math.abs(f(x) - g(x))); scale = Math.max(scale, Math.abs(g(x))); });
+    return { d: d, scale: Math.max(1, scale) };
+  }
+
+  const rows = (pairs) => pairs.map((p) => ({ xRaw: p[0], yRaw: p[1] }));
+
+  // ======================================================================
+  // Тести
+  // ======================================================================
+
+  const TOL = 1e-9; // відносний допуск для подвійної точності
+
+  suite('Лагранж', () => {
+    SETS.forEach((s) => {
+      test('проходить через усі вузли — ' + s.name, (expect) => {
+        const L = A.createLagrange(s.xs, s.ys);
+        let worst = 0;
+        s.xs.forEach((x, i) => { worst = Math.max(worst, Math.abs(L(x) - s.ys[i]) / Math.max(1, Math.abs(s.ys[i]))); });
+        expect.atMost(worst, TOL, 'max |L(xᵢ) − yᵢ| / max(1, |yᵢ|) по ' + s.xs.length + ' вузлах');
+        // Одноточковий виклик за формулою p(x) = Σ y_k·L_k(x) дає те саме
+        const mid = (s.xs[0] + s.xs[1]) / 2;
+        expect.close(A.lagrange(s.xs, s.ys, mid), L(mid), TOL, 'lagrange(xs, ys, x) = createLagrange(xs, ys)(x) у x = ' + mid);
+      });
+    });
+
+    test('базисні поліноми: L_k(x_j) = δ_kj — «5 точок»', (expect) => {
+      const s = SETS[0];
+      const L = A.createLagrange(s.xs, s.ys);
+      let worst = 0;
+      s.xs.forEach((_, k) => s.xs.forEach((xj, j) => { worst = Math.max(worst, Math.abs(L.basis(k, xj) - (k === j ? 1 : 0))); }));
+      expect.atMost(worst, TOL, 'max |L_k(x_j) − δ_kj|');
+    });
+  });
+
+  suite('Ньютон', () => {
+    test('таблиця поділених різниць «5 точок» = ручний розрахунок', (expect) => {
+      const s = SETS[0];
+      const newton = A.buildNewton(s.xs, s.ys);
+      // f[x₀]=−8.2; f[x₀,x₁]=7.1; f[x₀..x₂]=−2.9; f[x₀..x₃]=13/15; f[x₀..x₄]=19/240
+      const hand = [-8.2, 7.1, -2.9, 13 / 15, 19 / 240];
+      hand.forEach((v, k) => expect.close(newton.coeffsX[k], v, 1e-12, 'коефіцієнт порядку ' + k));
+    });
+
+    SETS.forEach((s) => {
+      test('збігається з Лагранжем — ' + s.name, (expect) => {
+        const interp = A.createInterpolant(s.xs, s.ys);
+        const a = Math.min.apply(null, s.xs), b = Math.max.apply(null, s.xs);
+        const atNodes = maxDiff(interp.newton, interp.lagrange, s.xs);
+        const between = maxDiff(interp.newton, interp.lagrange, grid(a, b, 1000));
+        expect.atMost(atNodes.d / atNodes.scale, TOL, 'у вузлах: max |N − L| / масштаб');
+        expect.atMost(between.d / between.scale, TOL, 'на 1001 точці між вузлами: max |N − L| / масштаб');
+      });
+    });
+  });
+
+  suite('МНК', () => {
+    SETS.forEach((s) => {
+      const m = s.xs.length - 1;
+      test('m = n − 1 = ' + m + ' збігається з інтерполяцією — ' + s.name, (expect) => {
+        const fit = A.lsqFit(s.xs, s.ys, m);
+        const L = A.createLagrange(s.xs, s.ys);
+        const scale = Math.max.apply(null, s.ys.map(Math.abs));
+        // Високий степінь (m = 19) гірше обумовлений, тому допуск ширший — але все одно ≪ даних
+        const tol = m > 10 ? 1e-7 : TOL;
+        expect.atMost(fit.maxAbs / scale, tol, 'залишки у вузлах: max |rᵢ| / max |yᵢ|');
+        const a = Math.min.apply(null, s.xs), b = Math.max.apply(null, s.xs);
+        const between = maxDiff(fit.evaluate, L, grid(a, b, 1000));
+        expect.atMost(between.d / between.scale, tol, 'між вузлами: max |P − L| / масштаб');
+      });
+    });
+
+    [
+      { name: 'x — вузли набору «8 точок»', xs: SETS[1].xs },
+      { name: 'x = 0, 0.5, …, 9.5', xs: SETS[2].xs },
+      { name: 'x = 1000, …, 1009.5 (перевірка нормалізації)', xs: SETS[2].xs.map((x) => x + 1000) }
+    ].forEach((c) => {
+      test('точні дані y = x³, m = 3: залишки ≈ 0 — ' + c.name, (expect) => {
+        const ys = c.xs.map((x) => x * x * x);
+        const fit = A.lsqFit(c.xs, ys, 3);
+        const scale = Math.max.apply(null, ys.map(Math.abs));
+        expect.atMost(fit.maxAbs / scale, 1e-12, 'max |rᵢ| / max |yᵢ|');
+        expect.close(fit.R2, 1, 1e-12, 'R²');
+        // Коефіцієнти в x показуємо лише для x біля нуля: при x ~ 1000 перерахунок t → x
+        // множить малі похибки на 1000³, це нормально — значення рахуються в t
+        if (c.xs[0] < 100) {
+          [0, 0, 0, 1].forEach((v, j) => expect.close(fit.coeffs[j], v, 1e-9, 'a' + j));
+        }
+      });
+    });
+
+    test('залишки ортогональні стовпцям дизайн-матриці (Aᵀr ≈ 0) — усі набори, m = 1…4', (expect) => {
+      SETS.forEach((s) => {
+        for (let m = 1; m <= 4; m++) {
+          const fit = A.lsqFit(s.xs, s.ys, m);
+          const scale = Math.max.apply(null, s.ys.map(Math.abs)) * s.xs.length;
+          expect.atMost(fit.orthogonality / scale, 1e-12, s.name + ', m = ' + m + ': max |Aᵀr| / (n·max|y|)');
+        }
+      });
+    });
+
+    test('m ≥ n відхиляється з повідомленням', (expect) => {
+      expect.throws(() => A.lsqFit([0, 1, 2], [1, 2, 3], 3), 'lsqFit(3 точки, m = 3)');
+    });
+  });
+
+  suite('Регресії (знайдені на рев’ю коду)', () => {
+    test('сталі y: автомасштаб не «провалюється» в шум, сітка скінченна', (expect) => {
+      [1.1, 3.3, 0.7, 123.456].forEach((c) => {
+        const xs = [0, 1, 2, 3, 4], ys = xs.map(() => c);
+        const fit = A.lsqFit(xs, ys, 3); // крива має шум округлення ~1e-16
+        const plot = new A.Plot(document.createElement('canvas'));
+        plot.setData({ points: xs.map((x) => ({ x: x, y: c })), curves: [{ key: 'model', label: 'P', fn: fit.evaluate }] });
+        const b = plot.bounds;
+        expect.truthy((b.yMax - b.yMin) > 0.1 * Math.abs(c), 'y = ' + c + ': розмах осі ' + (b.yMax - b.yMin).toPrecision(3) + ' > 10 % від |y|');
+        const ticks = A.niceTicks(b.yMin, b.yMax, 8).values.length;
+        expect.truthy(ticks > 0 && ticks <= 200, 'y = ' + c + ': поділок осі ' + ticks);
+      });
+      // Запобіжник циклу сітки: крок 1e-16 при значеннях ~1 не зациклюється
+      expect.truthy(A.niceTicks(1.1, 1.1 + 6.7e-16, 8).values.length <= 200, 'niceTicks(1.1, 1.1 + 6.7e-16) обмежено 200 поділками');
+    });
+
+    test('R² для сталих y невизначений (NaN), а не випадкове число', (expect) => {
+      [0.1, 0.7, 1.1, 3.3].forEach((c) => {
+        const fit = A.lsqFit([0, 1, 2, 3, 4], [c, c, c, c, c], 3);
+        expect.truthy(Number.isNaN(fit.R2), 'y ≡ ' + c + ': R² = ' + fit.R2);
+      });
+    });
+
+    test('анімація появи при prefers-reduced-motion не блокує перемальовування', (expect) => {
+      const orig = A.Animation.animate;
+      // Імітуємо reduced motion: animate() завершується синхронно, onDone — до повернення
+      A.Animation.animate = (d, onFrame, onDone) => { onFrame(1); onDone(); return () => {}; };
+      try {
+        const plot = new A.Plot(document.createElement('canvas'));
+        plot.setData({ points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] });
+        plot.animate();
+        expect.truthy(plot.cancelAnim === null, 'cancelAnim = null після синхронного завершення');
+      } finally {
+        A.Animation.animate = orig;
+      }
+    });
+
+    test('Ньютон стійкий на 50 точках (межа форми): вузли й збіг з Лагранжем', (expect) => {
+      const xs = Array.from({ length: 50 }, (_, i) => +(i * 0.2).toFixed(1));
+      const ys = xs.map((x) => +Math.cos(x).toFixed(3));
+      const interp = A.createInterpolant(xs, ys);
+      const check = A.verifyNodes(interp);
+      expect.truthy(check.ok, 'обидві форми проходять через 50 вузлів (max похибка ' + check.maxError.toExponential(1) + ')');
+      expect.atMost(check.newton.maxError, 1e-9, 'Ньютон: max |N(xᵢ) − yᵢ|');
+    });
+
+    test('валідація: близькі малі x — різні точки; величезні числа відхиляються', (expect) => {
+      expect.truthy(A.validatePoints(rows([['1e-13', '1'], ['5e-13', '2'], ['9e-13', '3']])).ok, '1e-13, 5e-13, 9e-13 — різні x');
+      expect.truthy(!A.validatePoints(rows([['1e300', '1'], ['2', '2']])).ok, '|x| = 1e300 відхилено');
+    });
+
+    test('підписи осей розрізняють малі значення (не «0.000000»)', (expect) => {
+      const t = A.niceTicks(1e-7, 3e-7, 5);
+      const labels = t.values.map((v) => A.formatTick(v, t.step));
+      expect.truthy(new Set(labels).size === labels.length, 'унікальні підписи: ' + labels.join(', '));
+    });
+  });
+
+  suite('Валідація', () => {
+    test('відхиляє однакові x', (expect) => {
+      const r = A.validatePoints(rows([['1', '2'], ['1', '5'], ['2', '0']]));
+      expect.truthy(!r.ok, 'ok = false');
+      expect.truthy(r.errors.some((e) => e.message && /однакові x/.test(e.message)), 'є повідомлення «однакові x»: ' + r.errors.map((e) => e.message).filter(Boolean).join('; '));
+      expect.truthy(r.errors.some((e) => e.row === 0) && r.errors.some((e) => e.row === 1), 'підсвічено обидва рядки (0 і 1)');
+    });
+
+    test('однакові x у різному записі: 1, 1.0, 1,0', (expect) => {
+      const r = A.validatePoints(rows([['1', '2'], ['1.0', '3'], ['1,0', '4']]));
+      expect.truthy(!r.ok, 'ok = false');
+    });
+
+    test('приймає різні x і сортує їх', (expect) => {
+      const r = A.validatePoints(rows([['2', '8'], ['−1', '−1'], ['0,5', '0.125'], ['', '']]));
+      expect.truthy(r.ok, 'ok = true (порожній рядок ігнорується, мінус «−» і кома допустимі)');
+      expect.truthy(r.points.map((p) => p.x).join() === '-1,0.5,2', 'x відсортовано: ' + r.points.map((p) => p.x).join(', '));
+    });
+
+    test('відхиляє менше 2 точок і нечислові значення', (expect) => {
+      expect.truthy(!A.validatePoints(rows([['1', '2']])).ok, 'одна точка');
+      expect.truthy(!A.validatePoints(rows([['1', 'abc'], ['2', '3']])).ok, 'y = «abc»');
+      expect.truthy(!A.validatePoints(rows([['1e', '1'], ['2', '3']])).ok, 'x = «1e»');
+    });
+  });
+
+  // ======================================================================
+  // Запуск і звіт
+  // ======================================================================
+
+  function runTests() {
+    const list = document.getElementById('results');
+    list.textContent = '';
+    let passed = 0;
+    const results = [];
+    let lastSuite = null;
+
+    registry.forEach((t) => {
+      if (t.suite !== lastSuite) {
+        const h = document.createElement('li');
+        h.innerHTML = '<h3 style="margin:2px 0"></h3>';
+        h.firstChild.textContent = t.suite;
+        list.appendChild(h);
+        lastSuite = t.suite;
+      }
+      const details = [];
+      const t0 = performance.now();
+      let error = null;
+      try { t.body(makeExpect(details)); } catch (err) { error = err; }
+      const ms = performance.now() - t0;
+      if (error && !(error instanceof AssertionError)) details.push('✗ виняток: ' + error.message);
+      const ok = !error;
+      if (ok) passed++;
+      results.push({ suite: t.suite, name: t.name, ok: ok, details: details });
+
+      const li = document.createElement('li');
+      li.className = ok ? 'pass' : 'fail';
+      li.innerHTML = '<div class="head"><span class="mark"></span><span class="name"></span><span class="time"></span></div><div class="details"></div>';
+      li.querySelector('.mark').textContent = ok ? '✓' : '✗';
+      li.querySelector('.name').textContent = t.name;
+      li.querySelector('.time').textContent = ms.toFixed(1) + ' мс';
+      li.querySelector('.details').textContent = details.join('\n');
+      list.appendChild(li);
+    });
+
+    const total = registry.length;
+    const summary = document.getElementById('summary');
+    const allOk = passed === total;
+    summary.className = 'summary ' + (allOk ? 'ok' : 'fail');
+    summary.textContent = (allOk ? '✓ Усі тести пройдено: ' : '✗ Пройдено ') + passed + ' з ' + total;
+    document.title = (allOk ? '✓ ' : '✗ ') + passed + '/' + total + ' — тести';
+    window.testResults = { passed: passed, total: total, results: results };
+  }
+
+  /** Медіана часу одного виклику fn, мкс (повтори пачками ≥ 5 мс, щоб обійти грубий таймер). */
+  function timeMicro(fn) {
+    let reps = 1;
+    for (;;) { // підбираємо розмір пачки
+      const t0 = performance.now();
+      for (let i = 0; i < reps; i++) fn();
+      if (performance.now() - t0 >= 5 || reps >= 1 << 20) break;
+      reps *= 2;
+    }
+    const samples = [];
+    for (let k = 0; k < 7; k++) {
+      const t0 = performance.now();
+      for (let i = 0; i < reps; i++) fn();
+      samples.push((performance.now() - t0) * 1000 / reps);
+    }
+    samples.sort((a, b) => a - b);
+    return samples[3];
+  }
+
+  function fmt(v, digits) {
+    if (!Number.isFinite(v)) return '—';
+    if (v === 0) return '0';
+    const a = Math.abs(v);
+    return (a < 1e-4 ? v.toExponential(1) : String(Number(v.toPrecision(digits || 4)))).replace('-', '−');
+  }
+
+  function buildComparisonTable() {
+    const tbody = document.querySelector('#compare-table tbody');
+    tbody.textContent = '';
+    // Прогрів: перші виклики повільніші через JIT-компіляцію і спотворили б першу клітинку
+    for (let k = 0; k < 300; k++) SETS.forEach((s) => [2, 3, 4].forEach((m) => { if (m < s.xs.length) A.lsqFit(s.xs, s.ys, m); }));
+    const table = [];
+    SETS.forEach((s, si) => {
+      [2, 3, 4].forEach((m, mi) => {
+        const tr = document.createElement('tr');
+        if (mi === 0 && si > 0) tr.className = 'group';
+        const n = s.xs.length;
+        let cells;
+        if (m >= n) {
+          cells = [s.name, m, '—', '—', '—', '—', 'потрібно ≥ ' + (m + 1) + ' точок'];
+        } else {
+          const fit = A.lsqFit(s.xs, s.ys, m);
+          const us = timeMicro(() => A.lsqFit(s.xs, s.ys, m));
+          const note = m === n - 1 ? 'm = n − 1: інтерполяція, залишки ≈ 0' : '';
+          cells = [s.name, m, fmt(fit.RMSE), fmt(fit.maxAbs), fmt(fit.R2, 6), fmt(us, 3), note];
+          table.push({ set: s.name, m: m, RMSE: fit.RMSE, maxAbs: fit.maxAbs, R2: fit.R2, us: us });
+        }
+        cells.forEach((c, i) => {
+          const td = document.createElement('td');
+          td.textContent = String(c);
+          if (i === 0) td.className = 'set';
+          if (i === 6) td.className = 'note';
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    });
+    window.comparisonTable = table;
+  }
+
+  function runAll() {
+    runTests();
+    // Таблиця — після тестів, щоб звіт з'явився одразу
+    setTimeout(buildComparisonTable, 30);
+  }
+
+  document.getElementById('rerun').addEventListener('click', runAll);
+  runAll();
+})();
+</script>
+</body>
+</html>
